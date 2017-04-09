@@ -159,7 +159,7 @@ Eigen::MatrixXd composer_;
 double bias_x = 5;
 double bias_y = 0.0;
 double threshold_x = 1.3;
-double threshold_y = 0.8;
+double threshold_y = 1;
 
 double SPEED_P = 0.15;
 double SPEED_N = 0 - SPEED_P;
@@ -171,22 +171,22 @@ std::deque<double> buffer_y;
 bool CONTACT_X = false;
 bool CONTACT_Y = false;
 
-void computeCompensationPlan(moveit::planning_interface::MoveGroup& group, moveit::planning_interface::MoveGroup::Plan& planZPositive, moveit::planning_interface::MoveGroup::Plan& planZNegative)
-{
-  // compute the moving plan to compensate the balance changes
-  // std::cout << "test" << std::endl;
-  group.setStartState( *group.getCurrentState());
-  geometry_msgs::PoseStamped currentPose;
-  float delta = 0.01; // 1cm step
+// void computeCompensationPlan(moveit::planning_interface::MoveGroup& group, moveit::planning_interface::MoveGroup::Plan& planZPositive, moveit::planning_interface::MoveGroup::Plan& planZNegative)
+// {
+//   // compute the moving plan to compensate the balance changes
+//   // std::cout << "test" << std::endl;
+//   group.setStartState( *group.getCurrentState());
+//   geometry_msgs::PoseStamped currentPose;
+//   float delta = 0.01; // 1cm step
 
-  currentPose.pose.position.z += delta;
-  group.setApproximateJointValueTarget(currentPose, group.getEndEffectorLink().c_str());
-  if (!group.plan(planZPositive)) std::cout << "Warning: Compensation plan for z positive failed!" << std::endl; // else std::cout << "Info: plan ok" << std::endl;
+//   currentPose.pose.position.z += delta;
+//   group.setApproximateJointValueTarget(currentPose, group.getEndEffectorLink().c_str());
+//   if (!group.plan(planZPositive)) std::cout << "Warning: Compensation plan for z positive failed!" << std::endl; // else std::cout << "Info: plan ok" << std::endl;
 
-  currentPose.pose.position.z -= 2 * delta;
-  group.setApproximateJointValueTarget(currentPose, group.getEndEffectorLink().c_str());
-  if (!group.plan(planZNegative)) std::cout << "Warning: Compensation plan for z negative failed!" << std::endl; // else std::cout << "Info: plan ok" << std::endl;
-}
+//   currentPose.pose.position.z -= 2 * delta;
+//   group.setApproximateJointValueTarget(currentPose, group.getEndEffectorLink().c_str());
+//   if (!group.plan(planZNegative)) std::cout << "Warning: Compensation plan for z negative failed!" << std::endl; // else std::cout << "Info: plan ok" << std::endl;
+// }
 
 
 Eigen::MatrixXd pInv(Eigen::MatrixXd& in)
@@ -253,13 +253,13 @@ void jointStatesCallback_hardcodded(const sensor_msgs::JointState::ConstPtr& msg
   Eigen::MatrixXd hard_coded_jacobian;
 hard_coded_jacobian.resize(6,5);
 hard_coded_jacobian << 
-	0,         0,         0,         0,         0,
+  0,         0,         0,         0,         0,
         0,         0,         0,         0,         0,
         0,         0,         0,         0,         0,
         0,         0,         0,         0, -0.902889,
         0, -0.983001, -0.983001, -0.983001,         0,
         1,         0,         0,         0,         0;
-	
+  
   Eigen::VectorXd hard_coded_gravity_compensation(8, 1);
   hard_coded_gravity_compensation << 0, 0, 0, 0, -0.210732, 0.0147815, -0.119112, -0.000477605;
   
@@ -447,8 +447,8 @@ void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg)
   Eigen::MatrixXd jacobian_short = Jacobian.rightCols(5);
   Eigen::VectorXd jacobianEffectiveIndex(6);
   Eigen::MatrixXd jacobian_mod = mod_Jacobian(jacobian_short, jacobianEffectiveIndex);
-  std::cout << "******* modified jacobian *******" << std::endl << jacobian_mod << std::endl ;
-  std::cout << "******* index *******" << std::endl << jacobianEffectiveIndex << std::endl ;
+  // std::cout << "******* modified jacobian *******" << std::endl << jacobian_mod << std::endl ;
+  // std::cout << "******* index *******" << std::endl << jacobianEffectiveIndex << std::endl ;
   force_external = jacobian_mod * torque_compensated.bottomRows(5);   
   
   /*
@@ -521,12 +521,12 @@ void jointStatesCallback(const sensor_msgs::JointState::ConstPtr& msg)
   if (CONTACT_Y && (fabs(mean_buffer - bias_y) < threshold_y)) CONTACT_Y = false;
   if (!CONTACT_Y && (fabs(mean_buffer - bias_y) > threshold_y)) CONTACT_Y = true;
   double speed_y = 0;
-  CONTACT_Y? (mean_buffer > bias_y ? (speed_y = SPEED_P * 3) : (speed_y = SPEED_N * 3) ) : (speed_y = 0);
+  CONTACT_Y? (mean_buffer > bias_y ? (speed_y = SPEED_P) : (speed_y = SPEED_N) ) : (speed_y = 0);
   
   command_move_base.linear.x = speed_x;
-//   command_move_base.linear.y = speed_y;
-  command_move_base.angular.z = speed_y;
-  // pub_move_base.publish(command_move_base);
+  command_move_base.linear.y = speed_y;
+  // command_move_base.angular.z = speed_y;
+ pub_move_base.publish(command_move_base);
 //   std::cout <<"contact Y ? " << CONTACT_Y << " & " << mean_buffer - bias_y  << std::endl;
   
 }
@@ -566,8 +566,8 @@ int main(int argc, char** argv)
   // initialize ros
   //////////////////////////////////////////////////////
   ros::init(argc, argv, "youbot_torque_measure");
-  ros::AsyncSpinner spin(2);
-  spin.start();
+  // ros::AsyncSpinner spin(2);
+  // spin.start();
   ros::NodeHandle nh;
 
   //////////////////////////////////////////////////////
@@ -601,8 +601,8 @@ int main(int argc, char** argv)
 
   std::vector <double> jointPositionValueVector(micro_dof);
   std::vector <double> jointVelocityValueVector(micro_dof);
-  // jointValueVector = {2.9569536007408317, 0.4739575839886909, -0.9624897412803051, 2.465840498581014, 2.8967032938532764}; // leading position
-  jointPositionValueVector = {2.931005253727047, 1.9054363596455477, -0.1762119319398515, 0.2550884739147205, 2.9189156813476718}; // take position
+  jointPositionValueVector = {2.9569536007408317, 0.4739575839886909, -0.9624897412803051, 2.465840498581014, 2.8967032938532764}; // human leading position
+  // jointPositionValueVector = {2.931005253727047, 1.9054363596455477, -0.1762119319398515, 0.2550884739147205, 2.9189156813476718}; // ready-to-carry position
   
 
   setArmPosition(jointPositionValueVector, commandPosition, "arm_joint_");
@@ -631,110 +631,110 @@ int main(int argc, char** argv)
   *****************************/
   ros::Subscriber sub = nh.subscribe("/joint_states", 1000, jointStatesCallback);
   // ros::Subscriber sub = nh.subscribe("/joint_states", 1000, jointStatesCallback);
-  pub_force_test = nh.advertise<Force_test>("youbot_arm_force_test", 1000);
+  pub_force_test = nh.advertise<Force_test>("youbot_human_leading_force", 1000);
 
-  /*****************************
-  // move in the vertical direction
-  *****************************/
-  geometry_msgs::PoseStamped currentPose;
-  geometry_msgs::Pose targetPose;
-  moveit::planning_interface::MoveGroup group("arm_1");
+  // /*****************************
+  // // move in the vertical direction
+  // *****************************/
+  // geometry_msgs::PoseStamped currentPose;
+  // geometry_msgs::Pose targetPose;
+  // moveit::planning_interface::MoveGroup group("arm_1");
 
-  moveit::planning_interface::MoveGroup::Plan myPlan;
-  // group.setStartStateToCurrentState ();
-  group.setStartState( *(group.getCurrentState()) );
-  // group.startStateMonitor();
+  // moveit::planning_interface::MoveGroup::Plan myPlan;
+  // // group.setStartStateToCurrentState ();
+  // group.setStartState( *(group.getCurrentState()) );
+  // // group.startStateMonitor();
   
-  // group.setPlannerId("RRTkConfigDefault");
-  // group.setPlannerId("RRTConnectkConfigDefault");
-  // group.setNumPlanningAttempts(10);
-  // group.setPlanningTime(15.0);
+  // // group.setPlannerId("RRTkConfigDefault");
+  // // group.setPlannerId("RRTConnectkConfigDefault");
+  // // group.setNumPlanningAttempts(10);
+  // // group.setPlanningTime(15.0);
 
-  // Playing around with tolerances
-  //robot_group.setGoalTolerance(0.01);       // default goal tolerance is 0.01 m
-  // group.setGoalPositionTolerance(0.01);
-  // group.setGoalOrientationTolerance(0.01);
-  // group.setGoalJointTolerance(0.01);
+  // // Playing around with tolerances
+  // //robot_group.setGoalTolerance(0.01);       // default goal tolerance is 0.01 m
+  // // group.setGoalPositionTolerance(0.01);
+  // // group.setGoalOrientationTolerance(0.01);
+  // // group.setGoalJointTolerance(0.01);
 
-  // target_pose.orientation.w = 1;
-  // target_pose.orientation.x= 4.04423e-07;
-  // target_pose.orientation.y = -0.687396;
-  // target_pose.orientation.z = 4.81813e-07;
+  // // target_pose.orientation.w = 1;
+  // // target_pose.orientation.x= 4.04423e-07;
+  // // target_pose.orientation.y = -0.687396;
+  // // target_pose.orientation.z = 4.81813e-07;
  
-  // target_pose.position.x = 0.0261186;
-  // target_pose.position.y = 4.50972e-07;
-  // target_pose.position.z = 0.573659;
+  // // target_pose.position.x = 0.0261186;
+  // // target_pose.position.y = 4.50972e-07;
+  // // target_pose.position.z = 0.573659;
 
-  currentPose = group.getCurrentPose();
-  std::cout << "current pose" << currentPose << std::endl;
-  // std::cout << "current info" << currentPose.header.frame_id.c_str() << std::endl;
-  // ros::Duration(0.5).sleep();
-  currentPose.pose.position.z += 0.05; // raise up 5 cm to lift the payload off the ground
+  // currentPose = group.getCurrentPose();
+  // std::cout << "current pose" << currentPose << std::endl;
+  // // std::cout << "current info" << currentPose.header.frame_id.c_str() << std::endl;
+  // // ros::Duration(0.5).sleep();
+  // currentPose.pose.position.z += 0.05; // raise up 5 cm to lift the payload off the ground
 
-  //////////////////////////////////////////////////////
-  // cartesian path planning 
-  //////////////////////////////////////////////////////
+  // //////////////////////////////////////////////////////
+  // // cartesian path planning 
+  // //////////////////////////////////////////////////////
 
-  group.setMaxVelocityScalingFactor(0.1);
+  // group.setMaxVelocityScalingFactor(0.1);
 
-  // moveit_msgs::RobotTrajectory trajectory;
-  // const double jump_threshold = 0.0;
-  // const double eef_step = 0.01;
-  // double fraction = group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+  // // moveit_msgs::RobotTrajectory trajectory;
+  // // const double jump_threshold = 0.0;
+  // // const double eef_step = 0.01;
+  // // double fraction = group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
 
-  //////////////////////////////////////////////////////
-  // trajectory planning 
-  //////////////////////////////////////////////////////
+  // //////////////////////////////////////////////////////
+  // // trajectory planning 
+  // //////////////////////////////////////////////////////
 
-  bool result2 = group.setApproximateJointValueTarget(currentPose, group.getEndEffectorLink().c_str());
+  // bool result2 = group.setApproximateJointValueTarget(currentPose, group.getEndEffectorLink().c_str());
 
-  // group.move();
+  // // group.move();
     
-  //////////////////////
-  # define MOVE_TO_POSITION true
-  # define MOVE_WITH_TRAJ false
+  // //////////////////////
+  // # define MOVE_TO_POSITION true
+  // # define MOVE_WITH_TRAJ false
 
-  if (group.plan(myPlan))
-  {
-    std::cout << " plan found! "<< std::endl;
-    if (MOVE_WITH_TRAJ)
-    {
-      std::vector<double> jointValueTrajStart;
-      std::vector<double> jointValueTrajEnd;
-      jointValueTrajStart = myPlan.trajectory_.joint_trajectory.points.front().positions;
-      jointValueTrajEnd = myPlan.trajectory_.joint_trajectory.points.back().positions;
-      // std::cout << " plan details: "<< std::endl;
-      // std::cout << "starting joints: " << std::endl;
-      // for(int i = 0; i < jointValueTrajStart.size(); ++i)
-      // {
-      //   std::cout << jointValueTrajStart[i] << "; ";
-      // }
-      // std::cout << std::endl;
+  // if (group.plan(myPlan))
+  // {
+  //   std::cout << " plan found! "<< std::endl;
+  //   if (MOVE_WITH_TRAJ)
+  //   {
+  //     std::vector<double> jointValueTrajStart;
+  //     std::vector<double> jointValueTrajEnd;
+  //     jointValueTrajStart = myPlan.trajectory_.joint_trajectory.points.front().positions;
+  //     jointValueTrajEnd = myPlan.trajectory_.joint_trajectory.points.back().positions;
+  //     // std::cout << " plan details: "<< std::endl;
+  //     // std::cout << "starting joints: " << std::endl;
+  //     // for(int i = 0; i < jointValueTrajStart.size(); ++i)
+  //     // {
+  //     //   std::cout << jointValueTrajStart[i] << "; ";
+  //     // }
+  //     // std::cout << std::endl;
 
-      // std::cout << "end joints: " << std::endl;
-      // for(int i = 0; i < jointValueTrajEnd.size(); ++i)
-      // {
-      //   std::cout << jointValueTrajEnd[i] << "; ";
-      // }
-      // std::cout << std::endl;
+  //     // std::cout << "end joints: " << std::endl;
+  //     // for(int i = 0; i < jointValueTrajEnd.size(); ++i)
+  //     // {
+  //     //   std::cout << jointValueTrajEnd[i] << "; ";
+  //     // }
+  //     // std::cout << std::endl;
 
-      // ros::Duration(2).sleep();
-      std::cout << " executing... "<< std::endl;
+  //     // ros::Duration(2).sleep();
+  //     std::cout << " executing... "<< std::endl;
 
-      setArmPosition(jointValueTrajEnd, commandPosition, "arm_joint_");
-      armPositionCommandPublisher.publish(commandPosition);
-    }
-    else
-    {
-      group.execute(myPlan);
-    }
-  }
+  //     setArmPosition(jointValueTrajEnd, commandPosition, "arm_joint_");
+  //     armPositionCommandPublisher.publish(commandPosition);
+  //   }
+  //   else
+  //   {
+  //     group.execute(myPlan);
+  //   }
+  // }
 
-  ros::Duration(2).sleep();
-  std::cout << " finished. "<< std::endl;
+  // ros::Duration(2).sleep();
+  // std::cout << " finished. "<< std::endl;
   
-  //////////////////////
-  std::cout << "finish moving." << std::endl;
+  // //////////////////////
+  // std::cout << "finish moving." << std::endl;
 
   // test move base
   pub_move_base = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
@@ -747,15 +747,15 @@ int main(int argc, char** argv)
   pub_move_base.publish(command_move_base); // dummy command to initialize
   ros::Duration(2).sleep(); 
 
-  moveit::planning_interface::MoveGroup::Plan planZPositive, planZNegative;
+  // moveit::planning_interface::MoveGroup::Plan planZPositive, planZNegative;
   
-  ros::Rate rateCompensatePlan = 10; // update the compensation at 10Hz
-  while(ros::ok()) 
-  {
-    computeCompensationPlan(group, planZPositive, planZNegative);
-    rateCompensatePlan.sleep();
-  }
-  // ros::spin();
+  // ros::Rate rateCompensatePlan = 10; // update the compensation at 10Hz
+  // while(ros::ok()) 
+  // {
+  //   computeCompensationPlan(group, planZPositive, planZNegative);
+  //   rateCompensatePlan.sleep();
+  // }
+  ros::spin();
 
   return 0;
 }

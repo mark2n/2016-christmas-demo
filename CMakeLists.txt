@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   message_generation
+  moveit_ros_planning_interface
+  keyboard_reader
 )
 
 
@@ -114,6 +116,7 @@ catkin_package(
   ahl_robot_controller
   ahl_robot_samples
   roscpp rospy std_msgs message_runtime
+  moveit_ros_planning_interface
 #  DEPENDS system_lib
 )
 
@@ -140,16 +143,25 @@ include_directories(
 
 # Declare a C++ executable
 add_executable(youbot_torque_measure_node src/youbot_torque_measure_node.cpp)
+add_executable(youbot_human_leading src/youbot_human_leading.cpp)
+add_executable(youbot_impedance src/youbot_impedance.cpp)
 
 ## Add cmake target dependencies of the executable
 # same as for the library above
 add_dependencies(youbot_torque_measure_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(youbot_human_leading ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(youbot_impedance ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(youbot_torque_measure_node
   ${catkin_LIBRARIES}
 )
-
+target_link_libraries(youbot_human_leading
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(youbot_impedance
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############
